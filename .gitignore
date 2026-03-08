@@ -1,0 +1,11 @@
+notepad .gitignore
+```
+
+**Paste this into Notepad:**
+```
+node_modules/
+build/
+.secret
+.env
+*.log
+.DS_Store
