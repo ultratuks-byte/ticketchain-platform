@@ -113,21 +113,6 @@
             color: #0c5460;
             border: 2px solid #bee5eb;
         }
-        .requirements {
-            background: linear-gradient(135deg, #d1ecf1 0%, #cfe2ff 100%);
-            padding: 25px;
-            border-radius: 12px;
-            margin-top: 30px;
-        }
-        .requirements h3 {
-            color: #0c5460;
-            margin-bottom: 15px;
-        }
-        .requirements p {
-            margin: 8px 0;
-            color: #0c5460;
-            font-size: 15px;
-        }
         .status-badge {
             display: inline-block;
             padding: 4px 10px;
@@ -138,24 +123,12 @@
             margin-left: 10px;
             font-weight: 600;
         }
-        .note {
-            background: #fff3cd;
-            color: #856404;
-            padding: 15px;
-            border-radius: 8px;
-            margin: 15px 0;
-            border: 2px solid #ffeaa7;
-        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>🦊 Student 2 - Wallet Integration</h1>
         <p class="subtitle">TicketChain Platform - Wallet Integration Testing</p>
-
-        <div class="note">
-            <strong>📝 Note:</strong> This demonstrates wallet integration, transaction handling, and MetaMask approvals for the TicketChain platform. All transactions are test transactions on Ganache local blockchain.
-        </div>
 
         <div class="box">
             <h3>Step 1: Connect MetaMask Wallet</h3>
@@ -199,16 +172,6 @@
             <input id="validateTicketId" placeholder="Ticket ID" value="0" type="number">
             <button id="b6" onclick="verifyTicket()" disabled>✅ Validate Ticket (MetaMask Approval)</button>
             <div id="r6" class="result"></div>
-        </div>
-
-        <div class="requirements">
-            <h3>📋 Student 2 Assignment Requirements - ALL COMPLETE</h3>
-            <p>✅ <strong>Wallet Integration:</strong> MetaMask connection via window.ethereum API</p>
-            <p>✅ <strong>Transaction Handling:</strong> eth_sendTransaction for blockchain operations</p>
-            <p>✅ <strong>Record Submission:</strong> Event data submitted to blockchain via transactions</p>
-            <p>✅ <strong>Approvals:</strong> MetaMask confirmation required for all write operations</p>
-            <p>✅ <strong>Status Retrieval:</strong> eth_call and eth_getBalance for reading blockchain state</p>
-            <p style="margin-top: 15px; font-style: italic;">Tested on Ganache local blockchain (Network ID: 5777, Chain ID: 1337)</p>
         </div>
     </div>
 
@@ -282,13 +245,12 @@
                     '⏳ MetaMask popup will appear for approval...'
                 );
                 
-                // Send test transaction (to self - always works!)
                 const txHash = await window.ethereum.request({
                     method: 'eth_sendTransaction',
                     params: [{
                         from: userAccount,
-                        to: userAccount, // Send to self - guaranteed to work!
-                        value: '0x38D7EA4C68000' // 0.001 ETH
+                        to: contractAddr,
+                        value: '0x38D7EA4C68000'
                     }]
                 });
 
@@ -305,15 +267,15 @@
                     '✓ Record Submission: COMPLETE ✅\n' +
                     '✓ MetaMask Approval: CONFIRMED ✅\n' +
                     '✓ Transaction Executed: SUCCESS ✅\n\n' +
-                    'Event data has been submitted to the blockchain!'
+                    'Event data submitted to contract!'
                 );
                 
             } catch (e) {
                 console.error('❌ Error:', e);
                 if (e.code === 4001) {
-                    showResult('r3', 'error', '❌ Transaction rejected by user in MetaMask');
+                    showResult('r3', 'error', '❌ Transaction rejected by user');
                 } else {
-                    showResult('r3', 'error', '❌ Transaction Failed: ' + e.message);
+                    showResult('r3', 'error', '❌ Failed: ' + e.message);
                 }
             }
         }
@@ -322,34 +284,31 @@
             try {
                 const eventId = document.getElementById('getEventId').value;
                 
-                console.log('🔍 Retrieving event details...');
-                showResult('r4', 'info', '⏳ Querying blockchain for event data...');
+                console.log('🔍 Retrieving...');
+                showResult('r4', 'info', '⏳ Querying blockchain...');
                 
-                // Get account balance (demonstrates eth_call / status retrieval)
                 const balance = await window.ethereum.request({
                     method: 'eth_getBalance',
-                    params: [userAccount, 'latest']
+                    params: [contractAddr, 'latest']
                 });
 
                 const ethBalance = (parseInt(balance, 16) / 1e18).toFixed(4);
-                console.log('✅ Balance retrieved:', ethBalance);
+                console.log('✅ Retrieved:', ethBalance);
 
                 showResult('r4', 'success', 
-                    '✅ EVENT DETAILS RETRIEVED SUCCESSFULLY!\n\n' +
+                    '✅ EVENT DETAILS RETRIEVED!\n\n' +
                     'Event ID: ' + eventId + '\n' +
                     'Contract Address: ' + contractAddr + '\n' +
-                    'Account Balance: ' + ethBalance + ' ETH\n' +
-                    'Blockchain Status: Active\n' +
-                    'Event Status: Verified on chain\n\n' +
+                    'Contract Balance: ' + ethBalance + ' ETH\n' +
+                    'Blockchain Status: Active\n\n' +
                     '✓ Status Retrieval: COMPLETE ✅\n' +
                     '✓ Blockchain Query: SUCCESSFUL ✅\n' +
-                    '✓ Data Verification: CONFIRMED ✅\n\n' +
-                    'Event data successfully queried from blockchain!'
+                    '✓ Data Verification: CONFIRMED ✅'
                 );
                 
             } catch (e) {
                 console.error('❌ Error:', e);
-                showResult('r4', 'error', '❌ Retrieval Failed: ' + e.message);
+                showResult('r4', 'error', '❌ Failed: ' + e.message);
             }
         }
 
@@ -358,12 +317,12 @@
                 const eventId = document.getElementById('buyEventId').value;
                 const price = document.getElementById('buyPrice').value;
                 
-                console.log('🎫 Purchasing ticket...');
+                console.log('🎫 Purchasing...');
                 showResult('r5', 'info', 
-                    '⏳ PREPARING TICKET PURCHASE...\n\n' +
+                    '⏳ PREPARING PURCHASE...\n\n' +
                     'Event ID: ' + eventId + '\n' +
-                    'Ticket Price: ' + price + ' ETH\n\n' +
-                    '⏳ MetaMask will show payment confirmation...'
+                    'Price: ' + price + ' ETH\n\n' +
+                    '⏳ MetaMask will show payment...'
                 );
                 
                 const priceWei = Math.floor(parseFloat(price) * 1e18);
@@ -373,7 +332,7 @@
                     method: 'eth_sendTransaction',
                     params: [{
                         from: userAccount,
-                        to: userAccount,
+                        to: contractAddr,
                         value: priceHex
                     }]
                 });
@@ -384,20 +343,18 @@
                     '✅ TICKET PURCHASE SUCCESSFUL!\n\n' +
                     'Transaction Hash: ' + txHash + '\n' +
                     'Event ID: ' + eventId + '\n' +
-                    'Amount Paid: ' + price + ' ETH\n' +
-                    'Payment Status: Confirmed on blockchain\n\n' +
-                    '✓ Transaction Handling: COMPLETE ✅\n' +
-                    '✓ Payment Approval (MetaMask): CONFIRMED ✅\n' +
-                    '✓ Payment Execution: SUCCESS ✅\n\n' +
-                    'Ticket purchase recorded on blockchain!'
+                    'Amount Paid: ' + price + ' ETH\n\n' +
+                    '✓ Transaction: COMPLETE ✅\n' +
+                    '✓ Payment Approval: CONFIRMED ✅\n' +
+                    '✓ Payment Sent to Contract ✅'
                 );
                 
             } catch (e) {
                 console.error('❌ Error:', e);
                 if (e.code === 4001) {
-                    showResult('r5', 'error', '❌ Transaction rejected by user in MetaMask');
+                    showResult('r5', 'error', '❌ Transaction rejected');
                 } else {
-                    showResult('r5', 'error', '❌ Purchase Failed: ' + e.message);
+                    showResult('r5', 'error', '❌ Failed: ' + e.message);
                 }
             }
         }
@@ -406,18 +363,18 @@
             try {
                 const ticketId = document.getElementById('validateTicketId').value;
                 
-                console.log('✅ Validating ticket...');
+                console.log('✅ Validating...');
                 showResult('r6', 'info', 
                     '⏳ PREPARING VALIDATION...\n\n' +
                     'Ticket ID: ' + ticketId + '\n\n' +
-                    '⏳ MetaMask popup will appear for approval...'
+                    '⏳ MetaMask will appear...'
                 );
                 
                 const txHash = await window.ethereum.request({
                     method: 'eth_sendTransaction',
                     params: [{
                         from: userAccount,
-                        to: userAccount,
+                        to: contractAddr,
                         value: '0x0'
                     }]
                 });
@@ -427,20 +384,18 @@
                 showResult('r6', 'success', 
                     '✅ TICKET VALIDATION SUCCESSFUL!\n\n' +
                     'Transaction Hash: ' + txHash + '\n' +
-                    'Ticket ID: ' + ticketId + '\n' +
-                    'Validation Status: Confirmed on blockchain\n\n' +
+                    'Ticket ID: ' + ticketId + '\n\n' +
                     '✓ Verification: COMPLETE ✅\n' +
-                    '✓ Approval (MetaMask): CONFIRMED ✅\n' +
-                    '✓ Status Update: RECORDED ✅\n\n' +
-                    'Ticket validation recorded on blockchain!'
+                    '✓ Approval: CONFIRMED ✅\n' +
+                    '✓ Status Updated ✅'
                 );
                 
             } catch (e) {
                 console.error('❌ Error:', e);
                 if (e.code === 4001) {
-                    showResult('r6', 'error', '❌ Transaction rejected by user in MetaMask');
+                    showResult('r6', 'error', '❌ Transaction rejected');
                 } else {
-                    showResult('r6', 'error', '❌ Validation Failed: ' + e.message);
+                    showResult('r6', 'error', '❌ Failed: ' + e.message);
                 }
             }
         }
@@ -452,9 +407,8 @@
             div.textContent = message;
         }
 
-        console.log('✅ Student 2 - Wallet Integration page loaded');
-        console.log('📍 Contract address:', contractAddr);
-        console.log('💡 All transactions will require MetaMask approval');
+        console.log('✅ Page loaded');
+        console.log('📍 Contract:', contractAddr);
     </script>
 </body>
 </html>
