@@ -107,6 +107,8 @@ contract TicketSystem {
     function validateTicket(uint256 _ticketId) public returns (bool) {
         require(_ticketId < ticketCounter, "Ticket doesn't exist");
         Ticket storage ticket = tickets[_ticketId];
+        Event storage evt = events[ticket.eventId];
+        require(msg.sender == evt.organizer, "Only organizer can validate");
         require(!ticket.isUsed, "Already used");
         
         ticket.isUsed = true;
