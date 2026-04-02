@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Tickets - TicketChain</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand"><span class="brand-name">🎫 TicketChain</span></div>
+            <ul class="nav-menu">
+                <li><a href="index.html">Home</a></li>
+                <li><a href="events.html">Events</a></li>
+                <li><a href="my-tickets.html" class="active">My Tickets</a></li>
+                <li><a href="dashboard.html">Dashboard</a></li>
+                <li><a href="validate.html">Validate Ticket</a></li>
+            </ul>
+            <button id="connectWalletBtn" class="btn-primary">Connect Wallet</button>
+        </div>
+    </nav>
+
+    <header class="page-header">
+        <div class="container">
+            <h1>Your Digital Assets</h1>
+            <p>View and manage all tickets owned by your connected wallet.</p>
+        </div>
+    </header>
+
+    <div class="container" style="padding: 3rem 0;">
+        <div id="loadingState" class="text-center">
+            <div class="spinner"></div>
+            <p>Scanning blockchain for your tickets...</p>
+        </div>
+
+        <div id="emptyState" class="card text-center" style="display: none; padding: 4rem;">
+            <h3>No Tickets Found</h3>
+            <p>You haven't purchased any tickets yet with this wallet address.</p>
+            <a href="events.html" class="btn-primary" style="display: inline-block; margin-top: 1rem;">Browse Events</a>
+        </div>
+
+        <div id="ticketsGrid" class="events-grid"></div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="utils.js"></script>
+    <script src="wallet.js"></script>
+    <script src="contract.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            // 1. Initial Setup - Check if wallet is connected
+            const account = await checkWalletConnection();
+            
+            if (!account) {
+                document.getElementById('loadingState').style.display = 'none';
+                document.getElementById('emptyState').style.display = 'block';
+                document.getElementById('emptyState').querySelector('h3').textContent = "Wallet Not Connected";
+                document.getElementById('emptyState').querySelector('p').textContent = "Please connect your MetaMask wallet to view your tickets.";
+                return;
+            }
+
+            updateNav(account);
+            await loadMyTickets(account);
+        });
+
+        async function loadMyTickets(userAddress) {
+            try {
+                const contract = await getContract_legacy();
+                
+                // Get all tickets from the contract
+                // In a production app, you'd use a mapping, but for this project 
+                // we iterate through the ticket counter
+                const totalTickets = await contract.ticketCounter();
+                const myTickets = [];
+
+                for (let i = 0; i < Number(totalTickets); i++) {
+                    const ticket = await contract.getTicket(i);
+                    
+                    // Check if the current connected account owns this ticket
+                    if (ticket.owner.toLowerCase() === userAddress.toLowerCase()) {
+                        const eventData = await contract.getEvent(ticket.eventId);
+                        myTickets.push({ ...ticket, event: eventData });
+                    }
+                }
+
+                renderTickets(myTickets);
+            } catch (error) {
+                console.error(error);
+                document.getElementById('loadingState').style.display = 'none';
+                document.getElementById('emptyState').style.display = 'block';
+                showNotification("Error loading tickets.", "danger");
+            }
+        }
+
+        function renderTickets(tickets) {
+            document.getElementById('loadingState').style.display = 'none';
+            const grid = document.getElementById('ticketsGrid');
+
+            if (tickets.length === 0) {
+                document.getElementById('emptyState').style.display = 'block';
+                return;
+            }
+
+            grid.innerHTML = tickets.map(t => `
+                <div class="card ticket-card">
+                    <div class="card-body">
+                        <div class="badge ${t.isUsed ? 'bg-danger' : 'bg-success'}">
+                            ${t.isUsed ? 'Used' : 'Valid'}
+                        </div>
+                        <h3>${t.event.name}</h3>
+                        <p class="small text-muted">Ticket ID: #${t.ticketId}</p>
+                        <div style="margin: 1rem 0; padding: 1rem; border: 1px dashed var(--gray-300);">
+                            <p><strong>Owner:</strong> ${formatAddress(t.owner)}</p>
+                            <p><strong>Date:</strong> ${formatDate(t.event.date)}</p>
+                        </div>
+                        <button class="btn-outline btn-block" onclick="window.location.href='validate.html?id=${t.ticketId}'">
+                            View QR / Validate
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function updateNav(account) {
+            const btn = document.getElementById('connectWalletBtn');
+            btn.textContent = formatAddress(account);
+            btn.classList.add('connected');
+        }
+    </script>
+</body>
+</html>

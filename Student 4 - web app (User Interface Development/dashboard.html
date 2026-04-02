@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Organizer Dashboard - TicketChain</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand"><span class="brand-name">🎫 TicketChain</span></div>
+            <ul class="nav-menu">
+                <li><a href="index.html">Home</a></li>
+                <li><a href="events.html">Events</a></li>
+                <li><a href="my-tickets.html">My Tickets</a></li>
+                <li><a href="dashboard.html" class="active">Dashboard</a></li>
+                <li><a href="validate.html">Validate Ticket</a></li>
+            </ul>
+            <button id="connectWalletBtn" class="btn-primary">Connect Wallet</button>
+        </div>
+    </nav>
+
+    <header class="page-header">
+        <div class="container">
+            <h1>Organizer Dashboard</h1>
+            <p>Manage your events, track sales, and validate attendee tickets.</p>
+        </div>
+    </header>
+
+    <div class="container" style="padding: 3rem 0;">
+        <div class="stats-grid" style="margin-bottom: 3rem;">
+            <div class="stat-card card">
+                <h3>Total Events</h3>
+                <p id="statTotalEvents" class="stat-number">0</p>
+            </div>
+            <div class="stat-card card">
+                <h3>Total Revenue</h3>
+                <p id="statTotalRevenue" class="stat-number">0 ETH</p>
+            </div>
+            <div class="stat-card card">
+                <h3>Tickets Sold</h3>
+                <p id="statTotalSold" class="stat-number">0</p>
+            </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+            <h2>Your Hosted Events</h2>
+            <a href="create-event.html" class="btn-primary">+ Create New Event</a>
+        </div>
+
+        <div id="loadingState" class="text-center">
+            <div class="spinner"></div>
+            <p>Loading your event data...</p>
+        </div>
+
+        <div id="emptyState" class="card text-center" style="display: none; padding: 3rem;">
+            <p>You haven't created any events yet.</p>
+            <a href="create-event.html" class="btn-outline" style="margin-top: 1rem; display: inline-block;">Start Organizing</a>
+        </div>
+
+        <div id="organizerEventsGrid" class="events-grid"></div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="utils.js"></script>
+    <script src="wallet.js"></script>
+    <script src="contract.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const account = await checkWalletConnection();
+            
+            if (!account) {
+                document.getElementById('loadingState').innerHTML = `
+                    <div class="card text-center" style="padding: 2rem;">
+                        <p>Please connect your wallet to view your dashboard.</p>
+                        <button onclick="connectWallet()" class="btn-primary">Connect MetaMask</button>
+                    </div>`;
+                return;
+            }
+
+            updateNav(account);
+            await loadDashboardData(account);
+        });
+
+        async function loadDashboardData(organizerAddress) {
+            try {
+                const contract = await getContract_legacy();
+                const eventCount = await contract.eventCounter();
+                
+                let myEvents = [];
+                let totalRevenue = BigInt(0);
+                let totalSold = 0;
+
+                // Loop through all events to find those belonging to this organizer
+                for (let i = 0; i < Number(eventCount); i++) {
+                    const event = await contract.getEvent(i);
+                    
+                    if (event.organizer.toLowerCase() === organizerAddress.toLowerCase()) {
+                        myEvents.push(event);
+                        // Revenue = Tickets Sold * Price
+                        const eventRevenue = BigInt(event.ticketsSold) * BigInt(event.ticketPrice);
+                        totalRevenue += eventRevenue;
+                        totalSold += Number(event.ticketsSold);
+                    }
+                }
+
+                updateStats(myEvents.length, totalRevenue, totalSold);
+                renderOrganizerEvents(myEvents);
+
+            } catch (error) {
+                console.error(error);
+                document.getElementById('loadingState').style.display = 'none';
+                document.getElementById('emptyState').style.display = 'block';
+                showNotification("Failed to load dashboard data.", "danger");
+            }
+        }
+
+        function updateStats(count, revenue, sold) {
+            document.getElementById('statTotalEvents').textContent = count;
+            document.getElementById('statTotalRevenue').textContent = `${formatEther(revenue)} ETH`;
+            document.getElementById('statTotalSold').textContent = sold;
+        }
+
+        function renderOrganizerEvents(events) {
+            document.getElementById('loadingState').style.display = 'none';
+            const grid = document.getElementById('organizerEventsGrid');
+
+            if (events.length === 0) {
+                document.getElementById('emptyState').style.display = 'block';
+                return;
+            }
+
+            grid.innerHTML = events.map(e => `
+                <div class="card">
+                    <div class="card-body">
+                        <div class="badge ${e.ticketsSold >= e.totalTickets ? 'bg-danger' : 'bg-success'}">
+                            ${e.ticketsSold >= e.totalTickets ? 'Sold Out' : 'Active'}
+                        </div>
+                        <h3>${e.name}</h3>
+                        <p class="small">📍 ${e.venue}</p>
+                        <hr>
+                        <div style="display: flex; justify-content: space-between; margin: 1rem 0;">
+                            <span><strong>Sold:</strong> ${e.ticketsSold}/${e.totalTickets}</span>
+                            <span><strong>Price:</strong> ${formatEther(e.ticketPrice)} ETH</span>
+                        </div>
+                        <div class="btn-group">
+                            <a href="event-details.html?id=${e.eventId}" class="btn-outline btn-small">View Page</a>
+                            <a href="validate.html?id=${e.eventId}" class="btn-primary btn-small">Validate Tickets</a>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function updateNav(account) {
+            const btn = document.getElementById('connectWalletBtn');
+            btn.textContent = formatAddress(account);
+            btn.classList.add('connected');
+        }
+    </script>
+</body>
+</html>

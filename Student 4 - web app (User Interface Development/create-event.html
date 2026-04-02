@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Event - TicketChain</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand"><span class="brand-name">🎫 TicketChain</span></div>
+            <ul class="nav-menu">
+                <li><a href="index.html">Home</a></li>
+                <li><a href="events.html">Events</a></li>
+                <li><a href="my-tickets.html">My Tickets</a></li>
+                <li><a href="dashboard.html">Dashboard</a></li>
+                <li><a href="validate.html">Validate Ticket</a></li>
+            </ul>
+            <button id="connectWalletBtn" class="btn-primary">Connect Wallet</button>
+        </div>
+    </nav>
+
+    <section class="page-header">
+        <div class="container">
+            <h1>Create New Event</h1>
+            <p>Fill in the details below to host your event on the blockchain.</p>
+        </div>
+    </section>
+
+    <div class="container" style="padding: 3rem 0; max-width: 800px;">
+        <div class="card" style="padding: 2.5rem;">
+            <form id="createEventForm">
+                <div class="form-group">
+                    <label class="form-label">Event Name</label>
+                    <input type="text" id="eventName" class="form-input" placeholder="e.g. Blockchain Summit 2026" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Venue / Location</label>
+                    <input type="text" id="eventVenue" class="form-input" placeholder="e.g. Lusaka Conference Centre" required>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                    <div class="form-group">
+                        <label class="form-label">Event Date & Time</label>
+                        <input type="datetime-local" id="eventDate" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Total Tickets Available</label>
+                        <input type="number" id="totalTickets" class="form-input" min="1" placeholder="100" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Ticket Price (ETH)</label>
+                    <input type="number" id="eventPrice" class="form-input" step="0.0001" min="0" placeholder="0.05" required>
+                    <small style="color: var(--gray-500);">Current ETH price will be converted to Wei automatically.</small>
+                </div>
+
+                <div id="formStatus" style="margin-bottom: 1.5rem;"></div>
+
+                <button type="submit" id="submitBtn" class="btn-primary btn-large btn-block">
+                    Deploy Event to Blockchain
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="utils.js"></script>
+    <script src="wallet.js"></script>
+    <script src="contract.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Check wallet connection on load
+            const account = await checkWalletConnection();
+            if (account) updateNav(account);
+
+            const form = document.getElementById('createEventForm');
+            
+            form.onsubmit = async (e) => {
+                e.preventDefault();
+                
+                if (!account) {
+                    showNotification("Please connect your wallet first!", "warning");
+                    return;
+                }
+
+                // Gather data from form
+                const name = document.getElementById('eventName').value;
+                const venue = document.getElementById('eventVenue').value;
+                const dateStr = document.getElementById('eventDate').value;
+                const priceEth = document.getElementById('eventPrice').value;
+                const total = document.getElementById('totalTickets').value;
+
+                // Convert inputs for Smart Contract
+                const timestamp = parseDateToTimestamp(dateStr); 
+                const priceWei = parseEther(priceEth); 
+
+                try {
+                    setLoading(true);
+                    showNotification("Confirm the transaction in MetaMask...", "info");
+
+                    const contract = await getContract_legacy();
+                    
+                    // Call the createEvent function from your Smart Contract
+                    const result = await contract.createEvent(
+                        name, 
+                        venue, 
+                        timestamp, 
+                        priceWei, 
+                        total
+                    );
+
+                    if (result.status) {
+                        showNotification("Event successfully created!", "success");
+                        // Redirect to dashboard to see the new event
+                        setTimeout(() => window.location.href = 'dashboard.html', 2000);
+                    }
+                } catch (error) {
+                    console.error(error);
+                    handleError(error, "Failed to create event");
+                } finally {
+                    setLoading(false);
+                }
+            };
+        });
+
+        function setLoading(isLoading) {
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = isLoading;
+            btn.textContent = isLoading ? "Deploying..." : "Deploy Event to Blockchain";
+        }
+
+        function updateNav(account) {
+            const btn = document.getElementById('connectWalletBtn');
+            btn.textContent = formatAddress(account);
+            btn.classList.add('connected');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Validate Ticket - TicketChain</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand"><span class="brand-name">🎫 TicketChain</span></div>
+            <ul class="nav-menu">
+                <li><a href="index.html">Home</a></li>
+                <li><a href="events.html">Events</a></li>
+                <li><a href="my-tickets.html">My Tickets</a></li>
+                <li><a href="dashboard.html">Dashboard</a></li>
+                <li><a href="validate.html">Validate Ticket</a></li>
+            </ul>
+            <button id="connectWalletBtn" class="btn-primary">Connect Wallet</button>
+        </div>
+    </nav>
+
+    <div class="container" style="padding: 4rem 0; max-width: 600px;">
+        <div class="card" style="padding: 2.5rem; text-align: center;">
+            <h2>Ticket Validation</h2>
+            <p style="margin-bottom: 2rem; color: var(--gray-600);">Enter the Ticket ID to verify authenticity and check-in the attendee.</p>
+            
+            <div class="form-group" style="text-align: left;">
+                <label class="form-label">Ticket ID</label>
+                <div style="display: flex; gap: 10px;">
+                    <input type="number" id="ticketIdInput" class="form-input" placeholder="e.g. 104">
+                    <button id="checkBtn" class="btn-primary">Check</button>
+                </div>
+            </div>
+
+            <div id="validationResult" style="display: none; margin-top: 2rem; padding: 2rem; border-radius: 12px;">
+                <div id="resultIcon" style="font-size: 3rem; margin-bottom: 1rem;"></div>
+                <h3 id="resultTitle"></h3>
+                <div id="ticketDetails" style="margin: 1.5rem 0; text-align: left; font-size: 0.9rem;"></div>
+                
+                <button id="validateBtn" class="btn-primary btn-block" style="display: none;">
+                    Confirm Check-In
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="utils.js"></script>
+    <script src="wallet.js"></script>
+    <script src="contract.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const account = await checkWalletConnection();
+            if (account) updateNav(account);
+
+            // Auto-fill ID if passed from dashboard
+            const params = new URLSearchParams(window.location.search);
+            if (params.has('id')) {
+                document.getElementById('ticketIdInput').value = params.get('id');
+                verifyTicket();
+            }
+
+            document.getElementById('checkBtn').onclick = verifyTicket;
+        });
+
+        async function verifyTicket() {
+            const ticketId = document.getElementById('ticketIdInput').value;
+            if (!ticketId) return;
+
+            const resultDiv = document.getElementById('validationResult');
+            const detailsDiv = document.getElementById('ticketDetails');
+            const validateBtn = document.getElementById('validateBtn');
+            
+            resultDiv.style.display = 'block';
+            resultDiv.style.background = 'var(--gray-100)';
+            document.getElementById('resultTitle').textContent = "Searching blockchain...";
+            detailsDiv.innerHTML = "";
+            validateBtn.style.display = 'none';
+
+            try {
+                const contract = await getContract_legacy();
+                const ticket = await contract.getTicket(ticketId);
+                const event = await contract.getEvent(ticket.eventId);
+
+                // Show Ticket Info
+                detailsDiv.innerHTML = `
+                    <p><strong>Event:</strong> ${event.name}</p>
+                    <p><strong>Owner:</strong> ${formatAddress(ticket.owner)}</p>
+                    <p><strong>Status:</strong> ${ticket.isUsed ? '❌ ALREADY USED' : '✅ VALID'}</p>
+                `;
+
+                if (ticket.isUsed) {
+                    document.getElementById('resultIcon').textContent = "⚠️";
+                    document.getElementById('resultTitle').textContent = "Invalid Ticket";
+                    resultDiv.style.background = "#fee2e2"; // Red background
+                } else {
+                    document.getElementById('resultIcon').textContent = "✔️";
+                    document.getElementById('resultTitle').textContent = "Ticket Verified";
+                    resultDiv.style.background = "#dcfce7"; // Green background
+                    validateBtn.style.display = 'block';
+                }
+
+                // Handle the actual Validation (Marking as used)
+                validateBtn.onclick = async () => {
+                    try {
+                        showNotification("Updating blockchain...", "info");
+                        const tx = await contract.validateTicket(ticketId);
+                        if (tx.status) {
+                            showNotification("Check-in successful!", "success");
+                            verifyTicket(); // Refresh view
+                        }
+                    } catch (err) {
+                        handleError(err, "Validation failed");
+                    }
+                };
+
+            } catch (error) {
+                document.getElementById('resultIcon').textContent = "❓";
+                document.getElementById('resultTitle').textContent = "Ticket Not Found";
+                detailsDiv.innerHTML = "<p>This Ticket ID does not exist on the network.</p>";
+            }
+        }
+
+        function updateNav(account) {
+            const btn = document.getElementById('connectWalletBtn');
+            btn.textContent = formatAddress(account);
+        }
+    </script>
+</body>
+</html>

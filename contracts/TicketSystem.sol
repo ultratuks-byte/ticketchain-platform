@@ -39,6 +39,7 @@ contract TicketSystem {
     
     // Events
     event EventCreated(uint256 indexed eventId, string name, address indexed organizer);
+    event EventCancelled(uint256 indexed eventId);
     event TicketPurchased(uint256 indexed ticketId, uint256 indexed eventId, address indexed buyer);
     event TicketValidated(uint256 indexed ticketId);
     event TicketTransferred(uint256 indexed ticketId, address indexed from, address indexed to);
@@ -73,6 +74,15 @@ contract TicketSystem {
         eventCounter++;
         emit EventCreated(eventId, _name, msg.sender);
         return eventId;
+    }
+
+    function cancelEvent(uint256 _eventId) public {
+        require(_eventId < eventCounter, "Event doesn't exist");
+        Event storage evt = events[_eventId];
+        require(msg.sender == evt.organizer, "Only organizer can cancel");
+        require(evt.isActive, "Event already cancelled");
+        evt.isActive = false;
+        emit EventCancelled(_eventId);
     }
     
     function buyTicket(uint256 _eventId) public payable returns (uint256) {

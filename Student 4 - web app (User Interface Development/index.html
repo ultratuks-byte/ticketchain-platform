@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TicketChain - Decentralized Event Ticketing</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <span class="brand-name">🎫 TicketChain</span>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="index.html" class="active">Home</a></li>
+                <li><a href="events.html">Events</a></li>
+                <li><a href="my-tickets.html">My Tickets</a></li>
+                <li><a href="dashboard.html">Dashboard</a></li>
+                <li><a href="validate.html">Validate Ticket</a></li>
+            </ul>
+            <button id="connectWalletBtn" class="btn-primary">Connect Wallet</button>
+        </div>
+    </nav>
+
+    <section class="hero">
+        <div class="container">
+            <div class="hero-content">
+                <h1 class="hero-title">Secure Event Tickets on the Blockchain</h1>
+                <p class="hero-subtitle">Buy, sell, and verify event tickets with complete transparency and zero fraud</p>
+                <div class="hero-buttons">
+                    <a href="events.html" class="btn-large btn-primary">Browse Events</a>
+                    <a href="create-event.html" class="btn-large btn-outline">Create Event</a>
+                </div>
+            </div>
+            <div class="hero-image">
+                <div class="blockchain-animation">
+                    <div class="block"></div>
+                    <div class="block"></div>
+                    <div class="block"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="features">
+        <div class="container">
+            <h2 class="section-title">Why TicketChain?</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🔒</div>
+                    <h3>Secure & Transparent</h3>
+                    <p>All tickets stored on blockchain, impossible to counterfeit</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">💰</div>
+                    <h3>No Hidden Fees</h3>
+                    <p>Only pay blockchain gas fees</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🎫</div>
+                    <h3>Easy Transfer</h3>
+                    <p>Transfer tickets instantly</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">✅</div>
+                    <h3>Instant Verification</h3>
+                    <p>Verify authenticity in seconds</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="stats">
+        <div class="container">
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-number" id="totalEvents">0</div>
+                    <div class="stat-label">Total Events</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number" id="totalTickets">0</div>
+                    <div class="stat-label">Tickets Sold</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number" id="activeUsers">0</div>
+                    <div class="stat-label">Active Users</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-bottom">
+                <p>&copy; 2026 TicketChain. Built with Solidity, Truffle, and MetaMask.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="config.js"></script>
+    <script src="wallet.js"></script>
+    <script src="contract.js"></script>
+    <script src="utils.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const account = await checkWalletConnection();
+            if (account) {
+                updateButton(account);
+                await loadStats();
+            }
+
+            document.getElementById('connectWalletBtn').addEventListener('click', async () => {
+                const account = await connectWallet();
+                if (account) {
+                    updateButton(account);
+                    await loadStats();
+                }
+            });
+        });
+
+        function updateButton(account) {
+            const btn = document.getElementById('connectWalletBtn');
+            btn.textContent = formatAddress(account);
+            btn.classList.add('connected');
+        }
+
+        async function loadStats() {
+            try {
+                const contract = await getContract_legacy();
+                const eventCounter = await contract.eventCounter();
+                const ticketCounter = await contract.ticketCounter();
+                
+                document.getElementById('totalEvents').textContent = eventCounter.toString();
+                document.getElementById('totalTickets').textContent = ticketCounter.toString();
+                document.getElementById('activeUsers').textContent = Math.floor(Number(ticketCounter) / 2);
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+    </script>
+</body>
+</html>

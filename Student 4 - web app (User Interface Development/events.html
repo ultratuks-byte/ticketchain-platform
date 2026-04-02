@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Browse Events - TicketChain</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <span class="brand-name">🎫 TicketChain</span>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="index.html">Home</a></li>
+                <li><a href="events.html" class="active">Events</a></li>
+                <li><a href="my-tickets.html">My Tickets</a></li>
+                <li><a href="dashboard.html">Dashboard</a></li>
+                <li><a href="validate.html">Validate Ticket</a></li>
+            </ul>
+            <button id="connectWalletBtn" class="btn-primary">Connect Wallet</button>
+        </div>
+    </nav>
+
+    <section class="page-header">
+        <div class="container">
+            <h1>Browse Events</h1>
+            <p>Discover upcoming events and purchase tickets securely</p>
+        </div>
+    </section>
+
+    <section class="filters">
+        <div class="container">
+            <div class="filter-group">
+                <input type="text" id="searchInput" placeholder="Search events..." class="search-input">
+                <select id="filterStatus" class="filter-select">
+                    <option value="all">All Events</option>
+                    <option value="active">Active</option>
+                    <option value="soldout">Sold Out</option>
+                </select>
+            </div>
+        </div>
+    </section>
+
+    <section class="events-section">
+        <div class="container">
+            <div id="loadingState" class="loading-state">
+                <div class="spinner"></div>
+                <p>Loading events from blockchain...</p>
+            </div>
+
+            <div id="emptyState" class="empty-state" style="display: none;">
+                <div class="empty-icon">🎫</div>
+                <h3>No Events Found</h3>
+                <p>No events available. Create your own event!</p>
+                <a href="create-event.html" class="btn-primary">Create Event</a>
+            </div>
+
+            <div id="eventsGrid" class="events-grid" style="display: none;"></div>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-bottom">
+                <p>&copy; 2026 TicketChain</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="config.js"></script>
+    <script src="wallet.js"></script>
+    <script src="contract.js"></script>
+    <script src="utils.js"></script>
+    <script>
+        let allEvents = [];
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const account = await checkWalletConnection();
+            if (account) updateButton(account);
+
+            document.getElementById('connectWalletBtn').addEventListener('click', async () => {
+                const account = await connectWallet();
+                if (account) {
+                    updateButton(account);
+                    await loadEvents();
+                }
+            });
+
+            await loadEvents();
+            document.getElementById('searchInput').addEventListener('input', filterEvents);
+            document.getElementById('filterStatus').addEventListener('change', filterEvents);
+        });
+
+        async function loadEvents() {
+            try {
+                showLoading();
+                const contract = await getContract_legacy();
+                const eventCounter = await contract.eventCounter();
+                const total = Number(eventCounter);
+
+                if (total === 0) {
+                    showEmptyState();
+                    return;
+                }
+
+                allEvents = [];
+                for (let i = 0; i < total; i++) {
+                    const event = await contract.getEvent(i);
+                    allEvents.push({
+                        id: Number(event.eventId),
+                        name: event.name,
+                        venue: event.venue,
+                        date: Number(event.date),
+                        ticketPrice: event.ticketPrice,
+                        totalTickets: Number(event.totalTickets),
+                        ticketsSold: Number(event.ticketsSold),
+                        organizer: event.organizer,
+                        isActive: event.isActive
+                    });
+                }
+
+                displayEvents(allEvents);
+            } catch (error) {
+                console.error('Error loading events:', error);
+                showEmptyState();
+            }
+        }
+
+        function displayEvents(events) {
+            const grid = document.getElementById('eventsGrid');
+            grid.innerHTML = '';
+
+            if (events.length === 0) {
+                showEmptyState();
+                return;
+            }
+
+            events.forEach(event => {
+                const card = document.createElement('div');
+                card.className = 'event-card';
+                
+                const remaining = event.totalTickets - event.ticketsSold;
+                const price = formatEther(event.ticketPrice);
+                const date = formatDate(event.date);
+                const soldOut = remaining === 0;
+
+                card.innerHTML = `
+                    <div class="event-image">
+                        <img src="https://via.placeholder.com/400x200/667eea/ffffff?text=Event" alt="${event.name}">
+                        ${soldOut ? '<span class="sold-out-badge">SOLD OUT</span>' : ''}
+                    </div>
+                    <div class="event-body">
+                        <h3 class="event-name">${event.name}</h3>
+                        <div class="event-info">
+                            <div class="info-item">
+                                <span class="icon">📍</span>
+                                <span>${event.venue}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="icon">📅</span>
+                                <span>${date}</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="icon">🎫</span>
+                                <span>${remaining} / ${event.totalTickets} available</span>
+                            </div>
+                        </div>
+                        <div class="event-footer">
+                            <div class="event-price">${price} ETH</div>
+                            <a href="event-details.html?id=${event.id}" class="btn-primary btn-small">Buy Ticket</a>
+                        </div>
+                    </div>
+                `;
+                
+                grid.appendChild(card);
+            });
+
+            hideLoading();
+            grid.style.display = 'grid';
+        }
+
+        function filterEvents() {
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            const status = document.getElementById('filterStatus').value;
+
+            let filtered = allEvents.filter(event => {
+                const matchesSearch = event.name.toLowerCase().includes(search) || 
+                                     event.venue.toLowerCase().includes(search);
+                let matchesStatus = true;
+                if (status === 'active') matchesStatus = event.ticketsSold < event.totalTickets;
+                if (status === 'soldout') matchesStatus = event.ticketsSold >= event.totalTickets;
+                
+                return matchesSearch && matchesStatus;
+            });
+
+            displayEvents(filtered);
+        }
+
+        function showLoading() {
+            document.getElementById('loadingState').style.display = 'block';
+            document.getElementById('emptyState').style.display = 'none';
+            document.getElementById('eventsGrid').style.display = 'none';
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingState').style.display = 'none';
+        }
+
+        function showEmptyState() {
+            hideLoading();
+            document.getElementById('emptyState').style.display = 'block';
+        }
+
+        function updateButton(account) {
+            const btn = document.getElementById('connectWalletBtn');
+            btn.textContent = formatAddress(account);
+            btn.classList.add('connected');
+        }
+    </script>
+</body>
+</html>

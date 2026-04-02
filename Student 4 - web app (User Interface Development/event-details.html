@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Event Details - TicketChain</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand"><span class="brand-name">🎫 TicketChain</span></div>
+            <ul class="nav-menu">
+                <li><a href="index.html">Home</a></li>
+                <li><a href="events.html">Events</a></li>
+                <li><a href="my-tickets.html">My Tickets</a></li>
+                <li><a href="dashboard.html">Dashboard</a></li>
+                <li><a href="validate.html">Validate Ticket</a></li>
+            </ul>
+            <button id="connectWalletBtn" class="btn-primary">Connect Wallet</button>
+        </div>
+    </nav>
+
+    <div class="container" style="padding-top: 5rem;">
+        <div id="loadingState" class="text-center">
+            <div class="spinner"></div>
+            <p>Fetching event details from blockchain...</p>
+        </div>
+
+        <div id="eventContent" style="display: none;">
+            <div class="event-detail-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 3rem;">
+                <div class="event-info-main">
+                    <h1 id="detName" class="hero-title" style="font-size: 3rem; color: var(--dark-color);"></h1>
+                    <div class="badge" id="detStatus" style="margin-bottom: 1rem;"></div>
+                    <p id="detDescription" style="font-size: 1.2rem; color: var(--gray-600);"></p>
+                    
+                    <div class="info-card" style="background: var(--gray-100); padding: 1.5rem; border-radius: 12px; margin-top: 2rem;">
+                        <p>📍 <strong>Venue:</strong> <span id="detVenue"></span></p>
+                        <p>📅 <strong>Date:</strong> <span id="detDate"></span></p>
+                        <p>🎫 <strong>Tickets Available:</strong> <span id="detAvailable"></span> / <span id="detTotal"></span></p>
+                    </div>
+                </div>
+
+                <div class="purchase-card card" style="padding: 2rem; border: 2px solid var(--primary-color);">
+                    <h3 style="margin-bottom: 1rem;">Purchase Ticket</h3>
+                    <div style="font-size: 2rem; font-weight: bold; color: var(--primary-color); margin-bottom: 1.5rem;">
+                        <span id="detPrice"></span> ETH
+                    </div>
+                    <p class="small" style="margin-bottom: 1.5rem; color: var(--gray-500);">
+                        *Transaction requires MetaMask confirmation and gas fees.
+                    </p>
+                    <button id="buyBtn" class="btn-primary btn-large btn-block">Buy Ticket Now</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="utils.js"></script>
+    <script src="wallet.js"></script>
+    <script src="contract.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            // 1. Initial Setup
+            const account = await checkWalletConnection();
+            if (account) updateNav(account);
+
+            // 2. Get ID from URL (e.g., event-details.html?id=1)
+            const params = new URLSearchParams(window.location.search);
+            const eventId = params.get('id');
+
+            if (!eventId) {
+                window.location.href = 'events.html';
+                return;
+            }
+
+            // 3. Load Event Data
+            try {
+                const contract = await getContract_legacy();
+                const event = await contract.getEvent(eventId);
+
+                // Populate UI
+                document.getElementById('detName').textContent = event.name;
+                document.getElementById('detVenue').textContent = event.venue;
+                document.getElementById('detPrice').textContent = formatEther(event.ticketPrice);
+                document.getElementById('detDate').textContent = formatDate(event.date);
+                document.getElementById('detAvailable').textContent = event.totalTickets - event.ticketsSold;
+                document.getElementById('detTotal').textContent = event.totalTickets;
+
+                const isSoldOut = event.ticketsSold >= event.totalTickets;
+                const isActive = event.isActive;
+                const statusBadge = document.getElementById('detStatus');
+
+                if (!isActive) {
+                    statusBadge.textContent = 'Cancelled';
+                    statusBadge.className = 'badge bg-danger';
+                    document.getElementById('buyBtn').disabled = true;
+                    document.getElementById('buyBtn').textContent = 'Event Cancelled';
+                } else if (isSoldOut) {
+                    statusBadge.textContent = 'Sold Out';
+                    statusBadge.className = 'badge bg-danger';
+                    document.getElementById('buyBtn').disabled = true;
+                    document.getElementById('buyBtn').textContent = 'Sold Out';
+                } else {
+                    statusBadge.textContent = 'Active';
+                    statusBadge.className = 'badge bg-success';
+                }
+
+                document.getElementById('loadingState').style.display = 'none';
+                document.getElementById('eventContent').style.display = 'block';
+
+                // 4. Handle Purchase
+                document.getElementById('buyBtn').onclick = async () => {
+                    if (!account) {
+                        alert("Please connect your wallet first!");
+                        return;
+                    }
+                    
+                    try {
+                        showNotification("Initiating transaction...", "info");
+                        const tx = await contract.buyTicket(eventId, event.ticketPrice);
+                        
+                        if (tx.status) {
+                            showNotification("Ticket purchased successfully!", "success");
+                            setTimeout(() => window.location.href = 'my-tickets.html', 2000);
+                        }
+                    } catch (err) {
+                        handleError(err, "Purchase failed");
+                    }
+                };
+
+            } catch (error) {
+                console.error(error);
+                document.getElementById('loadingState').innerHTML = `<p style="color:red;">Could not load event. Check your wallet is connected and Ganache is running.</p>`;
+                showNotification("Could not load event data.", "danger");
+            }
+
+            // Connect wallet button handler
+            document.getElementById('connectWalletBtn').addEventListener('click', async () => {
+                const acc = await connectWallet();
+                if (acc) updateNav(acc);
+            });
+        });
+
+        function updateNav(account) {
+            const btn = document.getElementById('connectWalletBtn');
+            btn.textContent = formatAddress(account);
+            btn.classList.add('connected');
+        }
+    </script>
+</body>
+</html>
